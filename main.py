@@ -1,9 +1,15 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 from flask import jsonify
+from flask_cors import CORS, cross_origin
 import pymongo, json
 from datetime import datetime
 
 app = Flask(__name__)
+
+#CORS(app,resources={r"/api/*":{"origins":"*"}})
+CORS(app)
+#app.config['CORS_HEADERS']='Content-Type'
+
 app.secret_key = "Telebuddy@123"
 
 Private_Repl_URL = "https://21a533fb-0d65-40cf-846d-319618e7f791-00-2oe2r5586vwp8.sisko.replit.dev/"  # Found this Private URL in "Toggle Developers Tool" in "Webview" section inside "Resources" tab. Scroll a bit to find it with "https://*.id.repl.co/" or "...repl.co".
