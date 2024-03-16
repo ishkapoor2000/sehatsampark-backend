@@ -163,7 +163,7 @@ def create_doctors():
     return render_template('camps.html', camps=allDoctors)  # Assuming you have a template for creating a camp
 
 
-@app.route('/get_available_doctors/<day>', methods=['GET'])
+@app.route('/get_available_doctors_staff/<day>', methods=['GET'])
 def get_available_doctors(day):
     if request.method == "GET":
         # allDoctors = list(doctors_collection.find({}, {'_id': False}))
@@ -171,8 +171,12 @@ def get_available_doctors(day):
             doctor for doctor in doctors_collection.find({}, {'_id': False})
             if day not in doctor.get('unavailable_days', [])
         ]
+        available_staff = [
+            staff for staff in staff_collection.find({}, {'_id': False})
+            if day not in staff.get('unavailable_days', [])
+        ]
 
-        return jsonify({"status": 200, "data": available_doctors}), 200
+        return jsonify({"status": 200, "doctor_data": available_doctors, "staff_data": available_staff}), 200
 
 
 @app.route('/get_all_doctors', methods=['GET'])
