@@ -4,7 +4,7 @@ from flask_cors import CORS, cross_origin
 import pymongo, json
 import requests
 
-# from send_sms import send_greeting_sms
+from send_sms import send_greeting_sms
 from pincode import get_nearby_areas
 
 from datetime import datetime
@@ -112,6 +112,13 @@ def create_camps():
 
         print(f">>> Camp created for id: {inserted_id} | {created_at}")
 
+        camp = camps_collection.find_one({"_id": inserted_id}, {'_id': False})
+        
+        camp_pincode = camp["venue"]["pin_code"]
+
+        send_sms(camp_pincode)
+        print("SMS Sent under </create_camps>")
+
         # Return a success message or redirect
         return jsonify({"status": 200, "camp_id": str(inserted_id), "message": "Camp created succesfully", "created_at": created_at}), 200
 
@@ -202,6 +209,86 @@ def get_all_doctors():
 #     send_greeting_sms(receiver_number, user_name, camp_name, camp_complete_address, camp_start_time, camp_end_time)
 
 
+def send_sms(pincode, distance=5):
+    """
+    Sends SMS notifications to users for nearby camps within a specified distance based on provided pincode.
+    
+    Args:
+        pincode (str): The pincode for which to find nearby camps.
+        distance (int, optional): The maximum distance in kilometers for nearby camps. Defaults to 5.
+    """
+    # Find nearby areas using the separate function
+    nearby_areas = get_nearby_areas(pincode, distance)
+
+    # Find matching users in the users collection
+    matching_users = list(users_collection.find({'pincode': {'$in': nearby_areas}}))
+
+    # Assuming 'venue.pin_code' is stored in camps collection documents
+    # This query finds the first camp within the specified pincode
+    camp = camps_collection.find_one({"venue.pin_code": pincode})
+
+    if camp:
+        # Extract camp details for SMS
+        camp_name = camp.get('camp_name', 'N/A')
+        camp_complete_address = camp.get('venue', {}).get('address', 'N/A')
+        camp_start_time = camp.get('time_period', {}).get('start_time', 'N/A')
+        camp_end_time = camp.get('time_period', {}).get('end_time', 'N/A')
+        
+        for user in matching_users:
+            # Send SMS notification using the separate function
+            send_greeting_sms(user['phone_number'], user['full_name'], camp_name, camp_complete_address,
+                              camp_start_time, camp_end_time)
+            print(f">>> SMS sent to {user['full_name']} for camp: {camp_name}")
+    else:
+        print("No camp found for the given pincode.")
+
+
+# def send_sms(pincode, distance=5):
+#     """
+#     The `send_sms` function sends SMS notifications to users for nearby camps within a specified
+#     distance based on provided pincodes.
+    
+#     :param pincode_list: A list of pincodes for which you want to find nearby camps and send SMS
+#     notifications to users in those areas
+#     :param distance: The `distance` parameter in the `send_sms` function represents the maximum distance
+#     in kilometers within which nearby camps will be searched for based on the provided list of pincodes.
+#     This distance is used to filter out camps that are beyond the specified range from each of the given
+#     pincodes
+    
+#     >>> Sends SMS notifications to users for nearby camps within a specified distance.
+
+#     Args:
+#         pincode_list (list): A list of pincodes for which to find nearby camps.
+#         distance (int): The maximum distance in kilometers for nearby camps.
+#     """
+#         # Find nearby areas using the separate function
+#     nearby_areas = get_nearby_areas(pincode, distance)
+
+#     # Find matching users in the users collection
+#     matching_users = users_collection.find({'pincode': {'$in': nearby_areas}})  # Use $in for multiple pincodes
+#     print(list(matching_users))
+
+#     # camp = list(camps_collection.find({'pincode': pincode}, {'_id': False}))
+#     camp = camps_collection.find_one({{"venue.pin_code": pincode}})
+#     print(camp)
+
+#     for user in matching_users:
+#         # Assuming a camp is available in nearby_areas (handle empty list if needed)
+#         # camp = nearby_areas[0]  # Access the first camp (modify logic if needed)
+
+#         # Extract camp details for SMS
+#         camp_name = camp['camp_name']  # Assuming camp_name exists in nearby_areas data
+#         camp_complete_address = camp['venue']['address']  # Assuming venue and address exist
+#         camp_start_time = camp['time_period']['start_time']  # Assuming time_period and start_time exist
+#         camp_end_time = camp['time_period']['end_time']  # Assuming time_period and end_time exis
+        
+#         print(">>>", camp_name, camp_complete_address, camp_start_time, camp_end_time)
+
+#         # Send SMS notification using the separate function
+#         send_greeting_sms(user['phone_number'], user['full_name'], camp_name, camp_complete_address,
+#                             camp_start_time, camp_end_time)
+
+
 @app.route('/create_staff', methods=['GET', 'POST'])
 def create_staff():
     if request.method == "POST":
@@ -259,7 +346,8 @@ def create_users():
         user_id = data.get('user_id')
         full_name = data.get('full_name')
         age = data.get('age')
-        pincode = data.get('age')
+        pincode = data.get('pincode')
+        phone_number = data.get('phone_number')
         gender = data.get('gender')
         disease_category = data.get('disease_category')
         payment_status = data.get('payment_status')
@@ -272,6 +360,7 @@ def create_users():
             full_name=full_name,
             age=age,
             pincode=pincode,
+            phone_number=phone_number,
             lat=None,
             long=None,
             gender=gender,
@@ -350,11 +439,12 @@ class Camps:
 class Users:
 
     # user_id, full_name, age, pincode, lat, long, gender, disease_category, payment_status, prescriptions, created_at
-    def __init__(self, user_id, full_name, age, pincode, lat, long, gender, disease_category, payment_status, prescriptions, created_at):
+    def __init__(self, user_id, full_name, age, pincode, phone_number, lat, long, gender, disease_category, payment_status, prescriptions, created_at):
         self.user_id = user_id
         self.full_name = full_name
         self.age = age
         self.pincode = pincode
+        self.phone_number = phone_number
         self.lat = lat
         self.long = long
         self.gender = gender
@@ -369,6 +459,7 @@ class Users:
             "full_name": self.full_name,
             "age": self.age,
             "pincode": self.pincode,
+            "phone_number": self.phone_number,
             "lat": self.lat,
             "long": self.long,
             "gender": self.gender,
