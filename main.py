@@ -2,6 +2,11 @@ from flask import Flask, render_template, request, redirect, session, url_for
 from flask import jsonify
 from flask_cors import CORS, cross_origin
 import pymongo, json
+import requests
+
+# from send_sms import send_greeting_sms
+from pincode import get_nearby_areas
+
 from datetime import datetime
 
 app = Flask(__name__)
@@ -192,6 +197,11 @@ def get_all_doctors():
         return jsonify({"status": 200, "doctor_data": allDoctors}), 200
 
 
+# def send_sms(pincode, receiver_number, user_name, camp_name, camp_complete_address, camp_start_time, camp_end_time):
+#     get_nearby_areas(pincode, distance)
+#     send_greeting_sms(receiver_number, user_name, camp_name, camp_complete_address, camp_start_time, camp_end_time)
+
+
 @app.route('/create_staff', methods=['GET', 'POST'])
 def create_staff():
     if request.method == "POST":
@@ -240,6 +250,58 @@ def get_all_staff():
     if request.method == "GET":
         allStaff = list(staff_collection.find({}, {'_id': False}))
         return jsonify({"status": 200, "staff_data": allStaff}), 200
+
+
+@app.route('/create_users', methods=['GET', 'POST'])
+def create_users():
+    if request.method == "POST":
+        data = request.json
+        user_id = data.get('user_id')
+        full_name = data.get('full_name')
+        age = data.get('age')
+        pincode = data.get('age')
+        gender = data.get('gender')
+        disease_category = data.get('disease_category')
+        payment_status = data.get('payment_status')
+        prescriptions = data.get('prescriptions')
+        created_at = datetime.now()
+
+        # Create a new Camps object
+        new_user = Users(
+            user_id=user_id,
+            full_name=full_name,
+            age=age,
+            pincode=pincode,
+            lat=None,
+            long=None,
+            gender=gender,
+            disease_category=disease_category,
+            payment_status=payment_status,
+            prescriptions=prescriptions,
+            created_at=created_at
+        )
+
+        # Generate a document from the Camps object
+        user_document = new_user.generate_document_JSON()
+
+        # Insert the new camp into the MongoDB collection
+        inserted_id = users_collection.insert_one(user_document).inserted_id
+
+        print(f">>> User Profile created for id: {inserted_id} | {created_at}")
+
+        # Return a success message or redirect
+        return jsonify({"status": 200, "user_id": str(inserted_id), "message": "User created succesfully", "created_at": created_at}), 200
+
+    allUser = list(user_collection.find({}, {'_id': False}))
+    # If it's a GET request, just render a template or return a message
+    return render_template('camps.html', camps=allUser)
+
+
+@app.route('/get_all_users', methods=['GET'])
+def get_all_users():
+    if request.method == "GET":
+        allUser = list(users_collection.find({}, {'_id': False}))
+        return jsonify({"status": 200, "users_data": allUser}), 200
 
 
 class Camps:
@@ -303,17 +365,17 @@ class Users:
     
     def generate_document_JSON(self):
     	return {
-    	    "user_id": user_id,
-            "full_name": full_name,
-            "age": age,
-            "pincode": pincode,
-            "lat": lat,
-            "long": long,
-            "gender": gender,
-            "disease_category": disease_category,
-            "payment_status": payment_status,
-            "prescriptions": prescriptions,
-            "created_at": created_at
+    	    "user_id": self.user_id,
+            "full_name": self.full_name,
+            "age": self.age,
+            "pincode": self.pincode,
+            "lat": self.lat,
+            "long": self.long,
+            "gender": self.gender,
+            "disease_category": self.disease_category,
+            "payment_status": self.payment_status,
+            "prescriptions": self.prescriptions,
+            "created_at": self.created_at
     	}
 
 
@@ -363,8 +425,9 @@ class Doctors:
 # This Python class defines a Staff object with attributes such as full name, age, expertise category,
 # years of experience, contact information, and availability schedule.
 class Staff:
-    def __init__(self, full_name, age, expertise_category, years_of_experience,
+    def __init__(self, user_id, full_name, age, expertise_category, years_of_experience,
                  phone_number, email, unavailable_days, designation, created_at):
+        self.user_id = user_id
         self.full_name = full_name
         self.expertise_category = expertise_category
         self.years_of_experience = years_of_experience
@@ -378,6 +441,7 @@ class Staff:
     def generate_document_JSON(self):
 
         return {
+            "user_id": self.user_id,
             "full_name": self.full_name,
             "expertise_category": self.expertise_category,
             "years_of_experience": self.years_of_experience,
