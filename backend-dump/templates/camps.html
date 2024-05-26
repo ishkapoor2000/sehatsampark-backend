@@ -1,0 +1,16 @@
+<!-- templates/camps.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Camps</title>
+</head>
+<body>
+    <h1>All Camps</h1>
+    <ul>
+        {% for camp in camps %}
+            <li>{{ camp.camp_name }} - {{ camp.date }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
